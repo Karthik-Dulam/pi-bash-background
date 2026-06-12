@@ -1,6 +1,7 @@
 {
   "name": "pi-bash-background",
   "version": "0.1.0",
+  "type": "module",
   "description": "Pi extension that lets Ctrl+B background a running bash command.",
   "keywords": ["pi-package"],
   "license": "MIT",
