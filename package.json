@@ -6,7 +6,10 @@
   "keywords": ["pi-package"],
   "license": "MIT",
   "pi": {
-    "extensions": ["./extensions/bash-background/index.ts"]
+    "extensions": [
+      "./extensions/bash-background/index.ts",
+      "./extensions/log-monitor/index.ts"
+    ]
   },
   "peerDependencies": {
     "@earendil-works/pi-agent-core": "*",
