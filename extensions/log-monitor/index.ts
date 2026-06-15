@@ -18,7 +18,7 @@ import type { FSWatcher } from "node:fs";
 import { basename } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
-import { Text } from "@earendil-works/pi-tui";
+import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -150,7 +150,7 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
             });
 
             return {
-                render: () => rows,
+                render: (width) => rows.map((r) => truncateToWidth(r, width)),
                 invalidate: () => {},
             };
         });
