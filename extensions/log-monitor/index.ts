@@ -13,9 +13,10 @@
  */
 
 import { spawn } from "node:child_process";
-import { closeSync, existsSync, openSync, readFileSync, readSync, statSync, watch } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync, watch, writeFileSync } from "node:fs";
 import type { FSWatcher } from "node:fs";
-import { basename } from "node:path";
+import { homedir } from "node:os";
+import { basename, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
@@ -34,6 +35,7 @@ interface Monitor {
     periodSeconds: number;
     triggerWords: string[];
     script: string;
+    scriptPath: string;
     // tracking
     lastSize: number;
     lastTriggeredAt: number; // epoch ms, 0 = never
@@ -321,12 +323,19 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
                 };
             }
 
+            // Save script to disk
+            const monitorsDir = join(homedir(), ".pi", "agent", "bash-background", "monitors");
+            mkdirSync(monitorsDir, { recursive: true });
+            const scriptPath = join(monitorsDir, `${params.id}.sh`);
+            writeFileSync(scriptPath, params.script, { mode: 0o755 });
+
             const mon: Monitor = {
                 id: params.id,
                 logFile: params.log_file,
                 periodSeconds: params.period_seconds,
                 triggerWords: params.trigger_words,
                 script: params.script,
+                scriptPath,
                 lastSize: 0,
                 lastTriggeredAt: 0,
                 lastReason: "",
@@ -362,6 +371,7 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
                 details: {
                     id: params.id,
                     logFile: params.log_file,
+                    scriptPath,
                     periodSeconds: params.period_seconds,
                     triggerWords: params.trigger_words,
                 },
@@ -379,10 +389,13 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
                 args.period_seconds > 0
                     ? theme.fg("dim", `every ${args.period_seconds}s`)
                     : theme.fg("dim", "event-only");
-            return new Text(
-                `${theme.bold("start_log_monitor")}  ${id}  ${file}  [${triggers}]  ${period}`,
-                0, 0
-            );
+            const header = `${theme.bold("start_log_monitor")}  ${id}  ${file}  [${triggers}]  ${period}`;
+            const scriptFile = args.id ? theme.fg("dim", `  → ~/.pi/agent/bash-background/monitors/${args.id}.sh`) : "";
+            const script = (args.script ?? "")
+                .split("\n")
+                .map((l: string) => `  ${theme.fg("dim", "│")} ${theme.fg("syntaxString", l)}`)
+                .join("\n");
+            return new Text(`${header}${scriptFile}\n${script}`, 0, 0);
         },
 
         renderResult(result, _opts, theme) {
@@ -393,12 +406,13 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
                     0, 0
                 );
             }
-            const d = result.details as { id?: string; logFile?: string } | undefined;
+            const d = result.details as { id?: string; logFile?: string; scriptPath?: string } | undefined;
             return new Text(
                 theme.fg("success", "✓ ") +
                     theme.fg("text", `Watching `) +
                     theme.fg("muted", d?.logFile ? basename(d.logFile) : "?") +
-                    theme.fg("dim", `  [${d?.id ?? "?"}]`),
+                    theme.fg("dim", `  [${d?.id ?? "?"}]`) +
+                    (d?.scriptPath ? `\n  ${theme.fg("dim", d.scriptPath)}` : ""),
                 0, 0
             );
         },
