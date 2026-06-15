@@ -419,6 +419,104 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
     });
 
     pi.registerTool({
+        name: "edit_log_monitor",
+        label: "Edit Log Monitor",
+        description: "Edit a running monitor's trigger words, period, or script without restarting it. Only pass fields you want to change.",
+        parameters: Type.Object({
+            id: Type.String({ description: "Monitor ID to edit" }),
+            trigger_words: Type.Optional(Type.Array(Type.String(), { description: "New trigger words (replaces existing)" })),
+            period_seconds: Type.Optional(Type.Number({ description: "New period in seconds (0 = event-only)", minimum: 0 })),
+            script: Type.Optional(Type.String({ description: "New analysis script" })),
+        }),
+
+        async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+            storedCtx = ctx;
+            const mon = monitors.get(params.id);
+            if (!mon) {
+                return {
+                    content: [{ type: "text", text: `No monitor found with id "${params.id}".` }],
+                    isError: true,
+                    details: {},
+                };
+            }
+
+            // Tear down existing watcher/timer
+            mon.watcher?.close();
+            mon.watcher = null;
+            if (mon.timer) { clearInterval(mon.timer); mon.timer = null; }
+
+            // Patch fields
+            if (params.trigger_words !== undefined) mon.triggerWords = params.trigger_words;
+            if (params.period_seconds !== undefined) mon.periodSeconds = params.period_seconds;
+            if (params.script !== undefined) {
+                mon.script = params.script;
+                writeFileSync(mon.scriptPath, params.script, { mode: 0o755 });
+            }
+
+            // Restart watcher/timer with patched config (keep lastSize/recentLines)
+            try {
+                mon.watcher = watch(mon.logFile, () => {
+                    const newText = readNewBytes(mon);
+                    if (!newText) return;
+                    const hit = matchesTrigger(newText, mon.triggerWords);
+                    if (hit) runScript(mon, `trigger word matched: "${hit}"`);
+                });
+            } catch { /* not watchable */ }
+
+            if (mon.periodSeconds > 0) {
+                mon.timer = setInterval(() => {
+                    readNewBytes(mon);
+                    runScript(mon, `periodic (every ${mon.periodSeconds}s)`);
+                }, mon.periodSeconds * 1000);
+                mon.timer.unref();
+            }
+
+            updateUI();
+
+            const changed = [
+                params.trigger_words !== undefined && `triggers → [${mon.triggerWords.join(", ")}]`,
+                params.period_seconds !== undefined && `period → ${mon.periodSeconds}s`,
+                params.script !== undefined && `script updated`,
+            ].filter(Boolean).join("  ");
+
+            return {
+                content: [{ type: "text", text: `Monitor "${params.id}" updated.\n${changed}` }],
+                details: { id: params.id, triggerWords: mon.triggerWords, periodSeconds: mon.periodSeconds, scriptPath: mon.scriptPath },
+            };
+        },
+
+        renderCall(args, theme) {
+            const id = theme.fg("accent", args.id ?? "?");
+            const parts: string[] = [];
+            if (args.trigger_words !== undefined)
+                parts.push(`triggers → [${theme.fg("warning", args.trigger_words.join("│"))}]`);
+            if (args.period_seconds !== undefined)
+                parts.push(`period → ${theme.fg("dim", args.period_seconds > 0 ? `every ${args.period_seconds}s` : "event-only")}`);
+            if (args.script !== undefined) {
+                parts.push("script →");
+                const lines = args.script.split("\n").map((l: string) => `  ${theme.fg("dim", "│")} ${theme.fg("syntaxString", l)}`).join("\n");
+                return new Text(`${theme.bold("edit_log_monitor")}  ${id}  ${parts.join("  ")}\n${lines}`, 0, 0);
+            }
+            return new Text(`${theme.bold("edit_log_monitor")}  ${id}  ${parts.join("  ")}`, 0, 0);
+        },
+
+        renderResult(result, _opts, theme) {
+            const d = result.details as { id?: string; triggerWords?: string[]; periodSeconds?: number } | undefined;
+            if (result.isError) {
+                const msg = result.content[0];
+                return new Text(theme.fg("error", msg?.type === "text" ? msg.text : "Error"), 0, 0);
+            }
+            return new Text(
+                theme.fg("success", "✓ ") +
+                theme.fg("muted", `${d?.id} updated`) +
+                (d?.triggerWords ? theme.fg("dim", `  [${d.triggerWords.join("│")}]`) : "") +
+                (d?.periodSeconds !== undefined ? theme.fg("dim", `  every ${d.periodSeconds}s`) : ""),
+                0, 0
+            );
+        },
+    });
+
+    pi.registerTool({
         name: "stop_log_monitor",
         label: "Stop Log Monitor",
         description: "Stop a running log monitor by its ID.",
