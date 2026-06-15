@@ -8,6 +8,7 @@ Minimal Pi extension that overrides the built-in `bash` tool so a foreground she
 - While the command is running, the status bar shows the background shortcuts.
 - Press `Ctrl+B` to return control to Pi immediately and let the agent keep working.
 - Press `Ctrl+Shift+B` to return control to Pi immediately and wait for the completion notification.
+- The tool result tells the agent how long the command ran before being backgrounded.
 - The shell process keeps running detached and writes output to `~/.pi/agent/bash-background/<job-id>.log`.
 - When the process exits, the extension emits a visible completion message with the output tail.
 

@@ -31,6 +31,7 @@ interface BackgroundJob {
     pid: number;
     logPath: string;
     startTime: number;
+    backgroundedAt?: number;
     endTime?: number;
     exitCode?: number | null;
     status: JobStatus;
@@ -128,6 +129,7 @@ function jobDetails(job: BackgroundJob): JobDetails {
         pid: job.pid,
         logPath: job.logPath,
         startTime: job.startTime,
+        backgroundedAt: job.backgroundedAt,
         endTime: job.endTime,
         exitCode: job.exitCode,
         status: job.status,
@@ -312,6 +314,7 @@ export default function bashBackgroundExtension(pi: ExtensionAPI): void {
                 background: (stopAgent: boolean) => {
                     if (didBackground) return;
                     didBackground = true;
+                    job.backgroundedAt = Date.now();
                     stopAgentAfterBackground = stopAgent;
                     proc.unref();
                     backgroundResolve?.();
@@ -330,8 +333,11 @@ export default function bashBackgroundExtension(pi: ExtensionAPI): void {
             const outputTail = readTail(logPath, OUTPUT_TAIL_CHARS);
 
             if (outcome === "backgrounded") {
+                const ranBeforeBackground = formatDuration(
+                    (job.backgroundedAt ?? Date.now()) - job.startTime
+                );
                 ctx.ui.notify(`Backgrounded ${job.id}. Log: ${logPath}`, "info");
-                const instruction = "User backgrounded the command. You will be notified when it is done.";
+                const instruction = `User backgrounded the command after ${ranBeforeBackground}. You will be notified when it is done.`;
                 return {
                     content: [
                         {
