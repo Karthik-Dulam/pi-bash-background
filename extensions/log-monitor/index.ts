@@ -125,14 +125,14 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
         // Footer
         const statusLabel =
             monitors.size === 1
-                ? theme.fg("accent", `⬤ monitor:${[...monitors.keys()][0]}`)
-                : theme.fg("accent", `⬤ ${monitors.size} monitors`);
+                ? theme.fg("accent", `● monitor:${[...monitors.keys()][0]}`)
+                : theme.fg("accent", `● ${monitors.size} monitors`);
         ctx.ui.setStatus("log-monitor", statusLabel);
 
         // Widget — one row per monitor
         ctx.ui.setWidget("log-monitor", (_tui, theme) => {
             const rows = [...monitors.values()].map((m) => {
-                const dot = theme.fg("accent", "⬤");
+                const dot = theme.fg("accent", "●");
                 const id = theme.bold(m.id);
                 const file = theme.fg("muted", basename(m.logFile));
                 const triggers =
@@ -510,7 +510,7 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
             const lines = rows
                 .map(
                     (r) =>
-                        theme.fg("accent", "⬤ ") +
+                        theme.fg("accent", "● ") +
                         theme.bold(r.id) +
                         theme.fg("dim", `  ${basename(r.logFile)}`) +
                         theme.fg(r.triggerCount > 0 ? "success" : "dim", `  ✦ ${r.triggerCount}`)
