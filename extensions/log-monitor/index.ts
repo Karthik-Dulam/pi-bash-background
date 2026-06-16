@@ -18,6 +18,7 @@ import type { FSWatcher } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { highlightCode } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 
@@ -391,9 +392,9 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
                     : theme.fg("dim", "event-only");
             const header = `${theme.bold("start_log_monitor")}  ${id}  ${file}  [${triggers}]  ${period}`;
             const scriptFile = args.id ? theme.fg("dim", `  → ~/.pi/agent/bash-background/monitors/${args.id}.sh`) : "";
-            const script = (args.script ?? "")
+            const script = highlightCode(args.script ?? "", "bash")
                 .split("\n")
-                .map((l: string) => `  ${theme.fg("dim", "│")} ${theme.fg("syntaxString", l)}`)
+                .map((l: string) => `  ${theme.fg("dim", "│")} ${l}`)
                 .join("\n");
             return new Text(`${header}${scriptFile}\n${script}`, 0, 0);
         },
@@ -494,7 +495,7 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
                 parts.push(`period → ${theme.fg("dim", args.period_seconds > 0 ? `every ${args.period_seconds}s` : "event-only")}`);
             if (args.script !== undefined) {
                 parts.push("script →");
-                const lines = args.script.split("\n").map((l: string) => `  ${theme.fg("dim", "│")} ${theme.fg("syntaxString", l)}`).join("\n");
+                const lines = highlightCode(args.script, "bash").split("\n").map((l: string) => `  ${theme.fg("dim", "│")} ${l}`).join("\n");
                 return new Text(`${theme.bold("edit_log_monitor")}  ${id}  ${parts.join("  ")}\n${lines}`, 0, 0);
             }
             return new Text(`${theme.bold("edit_log_monitor")}  ${id}  ${parts.join("  ")}`, 0, 0);
