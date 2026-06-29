@@ -20,7 +20,7 @@ import { basename, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { highlightCode } from "@earendil-works/pi-coding-agent";
 import { Type } from "@earendil-works/pi-ai";
-import { Text, truncateToWidth } from "@earendil-works/pi-tui";
+import { Text, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -132,28 +132,34 @@ export default function logMonitorExtension(pi: ExtensionAPI): void {
 
         // Widget — one row per monitor
         ctx.ui.setWidget("log-monitor", (_tui, theme) => {
-            const rows = [...monitors.values()].map((m) => {
-                const dot = theme.fg("accent", "●");
-                const id = theme.bold(m.id);
-                const file = theme.fg("muted", basename(m.logFile));
-                const triggers =
-                    m.triggerWords.length > 0
-                        ? theme.fg("warning", m.triggerWords.join("│"))
-                        : theme.fg("dim", "no triggers");
-                const period =
-                    m.periodSeconds > 0
-                        ? theme.fg("dim", `every ${m.periodSeconds}s`)
-                        : theme.fg("dim", "event-only");
-                const fires = theme.fg(
-                    m.triggerCount > 0 ? "success" : "dim",
-                    `✦ ${m.triggerCount}`
-                );
-                const last = theme.fg("dim", fmtAge(m.lastTriggeredAt));
-                return `  ${dot} ${id}  ${file}  [${triggers}]  ${period}  ${fires}  ${last}`;
-            });
-
             return {
-                render: (width) => rows.map((r) => truncateToWidth(r, width)),
+                render: (width) => {
+                    const expanded = storedCtx?.ui.getToolsExpanded() ?? false;
+                    const rows = [...monitors.values()].map((m) => {
+                        const dot = theme.fg("accent", "●");
+                        const id = theme.bold(m.id);
+                        const file = theme.fg("muted", basename(m.logFile));
+                        const triggers =
+                            m.triggerWords.length > 0
+                                ? theme.fg("warning", m.triggerWords.join("│"))
+                                : theme.fg("dim", "no triggers");
+                        const period =
+                            m.periodSeconds > 0
+                                ? theme.fg("dim", `every ${m.periodSeconds}s`)
+                                : theme.fg("dim", "event-only");
+                        const fires = theme.fg(
+                            m.triggerCount > 0 ? "success" : "dim",
+                            `✦ ${m.triggerCount}`
+                        );
+                        const last = theme.fg("dim", fmtAge(m.lastTriggeredAt));
+                        return `  ${dot} ${id}  ${file}  [${triggers}]  ${period}  ${fires}  ${last}`;
+                    });
+
+                    if (expanded) {
+                        return rows.flatMap((r) => wrapTextWithAnsi(r, width));
+                    }
+                    return rows.map((r) => truncateToWidth(r, width));
+                },
                 invalidate: () => {},
             };
         });
